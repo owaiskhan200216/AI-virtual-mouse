@@ -1,160 +1,94 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+# AI Virtual Mouse Project
+'''  Owais Khan 
+     Btech CSE AI
+     2021-350-048  '''
 
-# C extensions
-*.so
+# place necessary imports here
+import mediapipe as mp
+import cv2
+import pyautogui
+mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
+mp_hands = mp.solutions.hands
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# environment variables
+wCam, hCam = 640, 480
+screenX, screenY = pyautogui.size() # dimensions of screen
+screenCenter = (screenX // 2, screenY // 2)
+# debug show resolution print(f"screen dimensions: {screenX}x{screenY}")
+clickThreshold = 0.05 # threshold for click gesture
+sensitivity = 1.6 # controls how fast mouse moves
+prevFingerPos = None
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+cap = cv2.VideoCapture(0)
+cap.set(3, wCam)
+cap.set(4, hCam)
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+hands = mp_hands.Hands()
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
+stopProgram = False
+while not stopProgram:
+    success, img = cap.read()
 
-# Translations
-*.mo
-*.pot
+    # display a window of the current webcam footage each frame
+    img = cv2.flip(img, 1)
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+    rgbFrame = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-# Flask stuff:
-instance/
-.webassets-cache
+    results = hands.process(rgbFrame)
 
-# Scrapy stuff:
-.scrapy
+    if results.multi_hand_landmarks:
+        # Grab first (only) set of hand landmarks
+        lm = results.multi_hand_landmarks[0]
 
-# Sphinx documentation
-docs/_build/
+        # Isolate index fingertip and middle fingertip
+        ttip = lm.landmark[mp_hands.HandLandmark.THUMB_TIP]
+        iftip = lm.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
+        mftip = lm.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_TIP]
+        rftip = lm.landmark[mp_hands.HandLandmark.RING_FINGER_TIP]
+        ptip = lm.landmark[mp_hands.HandLandmark.PINKY_TIP]
 
-# PyBuilder
-.pybuilder/
-target/
+        # debug show fingertip coordinates relative position print(f"X: {iftip_x} | Y: {iftip_y} | Z: {iftip_z}")
+        cv2.circle(img, (int(ptip.x * img.shape[1]), int(ptip.y * img.shape[0])), 5, (0, 255, 0), -1)
+        cv2.circle(img, (int(iftip.x * img.shape[1]), int(iftip.y * img.shape[0])), 5, (255, 0, 0), -1)
+        cv2.circle(img, (int(mftip.x * img.shape[1]), int(mftip.y * img.shape[0])), 5, (0, 0, 255), -1)
+        cv2.circle(img, (int(ttip.x * img.shape[1]), int(ttip.y * img.shape[0])), 5, (255, 255, 255), -1)
+        cv2.circle(img, (int(rftip.x * img.shape[1]), int(rftip.y * img.shape[0])), 5, (255, 165, 0), -1)
 
-# Jupyter Notebook
-.ipynb_checkpoints
+        cv2.line(img, (int(iftip.x * img.shape[1]), int(iftip.y * img.shape[0])), (int(ttip.x * img.shape[1]), int(ttip.y * img.shape[0])), (0, 255, 0), 5)
+        cv2.line(img, (int(mftip.x * img.shape[1]), int(mftip.y * img.shape[0])), (int(ttip.x * img.shape[1]), int(ttip.y * img.shape[0])), (0, 255, 0), 5)
+        cv2.line(img, (int(rftip.x * img.shape[1]), int(rftip.y * img.shape[0])), (int(ttip.x * img.shape[1]), int(ttip.y * img.shape[0])), (0, 0, 255), 5)
 
-# IPython
-profile_default/
-ipython_config.py
+        cv2.imshow("Image", img)
+        cv2.waitKey(1)
 
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
+        # Move mouse cursor to current fingertip position
+        fingerX = int(screenCenter[0] + screenX * (ptip.x - 0.5) * sensitivity)
+        fingerY = int(screenCenter[1] + screenY * (ptip.y - 0.5) * sensitivity)
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
+        # Pad mouse cursor to edges
+        screenUpper = screenY * 2
+        screenRight = screenX * 2
+        fingerX = fingerX if fingerX > 3 else 3
+        fingerY = fingerY if fingerY > 3 else 3
+        fingerX = fingerX if fingerX < screenRight - 3 else screenRight - 3
+        fingerY = fingerY if fingerY < screenUpper - 3 else screenUpper - 3
 
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
+        # debug show fingertip coordinates by screen resolution 
+        # print(f"X: {fingerX} | Y: {fingerY}")
+        if prevFingerPos is None or abs(fingerX - prevFingerPos[0]) > 5 or abs(fingerY - prevFingerPos[1]) > 5:
+                pyautogui.moveTo(fingerX, fingerY)
+                prevFingerPos = (fingerX, fingerY)
 
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#pdm.lock
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/#use-with-ide
-.pdm.toml
+        # calculate distance from each finger to the thumb
+        leftDistance = ((iftip.x - ttip.x)**2 + (iftip.y - ttip.y)**2)**0.5
+        rightDistance = ((mftip.x - ttip.x)**2 + (mftip.y - ttip.y)**2)**0.5
+        quitDistance = ((rftip.x - ttip.x)**2 + (rftip.y - ttip.y)**2)**0.5
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
+        # click if finger is touching thumb
+        if leftDistance < clickThreshold:
+            pyautogui.leftClick()
+        elif rightDistance < clickThreshold:
+            pyautogui.rightClick()
+        elif quitDistance < clickThreshold:
+            stopProgram = True
