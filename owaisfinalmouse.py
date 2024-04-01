@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[3]:
+
 
 
 # AI Virtual Mouse Project
@@ -100,13 +100,12 @@ while not stopProgram:
             stopProgram = True
 
 
-# In[ ]:
 
 
 
 
 
-# In[ ]:
+
 
 
 
